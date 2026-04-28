@@ -1,0 +1,100 @@
+using Dapper;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.OpenApi.Models;
+using PAN.API.Application.Services.Implementations;
+using PAN.API.Application.Services.Interfaces;
+using PAN.API.Configurations;
+using PAN.API.Infrastructure.Dapper;
+using PAN.API.Infrastructure.Providers.Implementations;
+using PAN.API.Infrastructure.Providers.Interfaces;
+using PAN.API.Infrastructure.Repositories.Implementations;
+using PAN.API.Infrastructure.Repositories.Interfaces;
+using PAN.API.Middleware;
+using PAN.API.Utilities;
+using Serilog;
+
+var builder = WebApplication.CreateBuilder(args);
+
+
+Dapper.DefaultTypeMap.MatchNamesWithUnderscores = true;
+
+
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.SuppressModelStateInvalidFilter = true;
+});
+
+// Controllers
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = null;
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+    });
+
+
+LoggerConfig.ConfigureLogger();
+builder.Host.UseSerilog();
+
+builder.Services.AddMemoryCache();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "PAN API",
+        Version = "v1"
+    });
+});
+
+
+builder.Services.AddHttpClient("SurepassClient", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+
+builder.Services.AddHttpClient("SprintVerifyClient", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+
+
+builder.Services.AddSingleton<DapperContext>();
+
+
+builder.Services.AddSingleton<ICacheService, CacheService>();
+builder.Services.AddSingleton<EncryptionService>();
+builder.Services.AddHostedService<CacheWarmupService>();
+
+
+builder.Services.AddScoped<IPanRepository, PanRepository>();
+builder.Services.AddScoped<IRawResponseRepository, RawResponseRepository>();
+builder.Services.AddScoped<IMasterRepository, MasterRepository>();
+builder.Services.AddScoped<IHealthRepository, HealthRepository>();
+builder.Services.AddScoped<IHealthService, HealthService>();
+
+
+builder.Services.AddScoped<ISurePassService, SurePassProvider>();
+builder.Services.AddScoped<ISprintVerifyService, SprintVerifyProvider>();
+
+// Services
+builder.Services.AddScoped<IFallbackService, ProviderFallbackService>();
+builder.Services.AddScoped<IPanVerificationService, PanVerificationService>();
+
+var app = builder.Build();
+
+// ✅ 1. Correlation FIRST
+app.UseMiddleware<CorrelationIdMiddleware>();
+
+// ✅ 2. Swagger BEFORE anything else
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "PAN API v1");
+});
+
+app.UseMiddleware<GlobalExceptionMiddleware>();
+
+app.UseAuthorization();
+app.MapControllers();
+app.Run();
