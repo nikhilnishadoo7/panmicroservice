@@ -75,7 +75,7 @@ public class PanVerificationService : IPanVerificationService
         SafeLogger.App("PAN Cache MISS — calling providers");
 
         
-        var (success, response, providerName) = await _fallbackService.ExecuteAsync(pan, correlationId);
+        var (success, response, providerName) = await _fallbackService.FallbackAsync(pan, correlationId);
 
         if (!success || response == null)
             throw new AppException("PROVIDER_FAILURE", "All PAN providers failed", 502);

@@ -19,55 +19,50 @@ public class CorrelationIdMiddleware
 
         try
         {
-            
-            var path = context.Request.Path.Value;
-            if (path != null && path.StartsWith("/swagger"))
-            {
-                await _next(context);
-                return;
-            }
-
             var correlationId = Guid.NewGuid().ToString();
             context.Items["CorrelationId"] = correlationId;
 
-           
+            // -------- Read Request --------
             context.Request.EnableBuffering();
 
             string requestBody = "";
 
-            try
+            if (context.Request.ContentLength > 0)
             {
-                if (context.Request.ContentLength > 0)
-                {
-                    using var reader = new StreamReader(
-                        context.Request.Body,
-                        Encoding.UTF8,
-                        detectEncodingFromByteOrderMarks: false,
-                        leaveOpen: true
-                    );
+                using var reader = new StreamReader(
+                    context.Request.Body,
+                    Encoding.UTF8,
+                    detectEncodingFromByteOrderMarks: false,
+                    leaveOpen: true
+                );
 
-                    requestBody = await reader.ReadToEndAsync();
-                    context.Request.Body.Position = 0;
+                requestBody = await reader.ReadToEndAsync();
+                context.Request.Body.Position = 0;
+            }
+
+            object? requestData = null;
+
+            if (!string.IsNullOrWhiteSpace(requestBody))
+            {
+                try
+                {
+                    requestData = JsonSerializer.Deserialize<object>(requestBody);
+                }
+                catch
+                {
+                    requestData = requestBody;
                 }
             }
-            catch (Exception ex)
-            {
-                SafeLogger.Error(ex, "Error reading request body", context);
-            }
 
-            var requestLog = JsonSerializer.Serialize(new
+            SafeLogger.Request(JsonSerializer.Serialize(new
             {
                 correlationId,
                 endpoint = context.Request.Path.Value,
                 method = context.Request.Method,
-                body = string.IsNullOrWhiteSpace(requestBody)
-                            ? null
-                            : JsonSerializer.Deserialize<object>(requestBody)
-            });
+                body = requestData
+            }), correlationId);
 
-            SafeLogger.Request(requestLog, correlationId);
-
-            
+            // -------- Capture Response --------
             originalBody = context.Response.Body;
 
             using var memStream = new MemoryStream();
@@ -75,28 +70,47 @@ public class CorrelationIdMiddleware
 
             await _next(context);
 
+            // -------- Read Response --------
             memStream.Position = 0;
             var responseBody = await new StreamReader(memStream).ReadToEndAsync();
 
-            var responseLog = JsonSerializer.Serialize(new
+            object? body = null;
+
+            if (!string.IsNullOrWhiteSpace(responseBody))
+            {
+                if (context.Response.ContentType != null &&
+                    context.Response.ContentType.Contains("application/json"))
+                {
+                    try
+                    {
+                        body = JsonSerializer.Deserialize<object>(responseBody);
+                    }
+                    catch
+                    {
+                        body = responseBody; // fallback
+                    }
+                }
+                else
+                {
+                    body = responseBody; // keep as string
+                }
+            }
+
+            SafeLogger.Response(JsonSerializer.Serialize(new
             {
                 correlationId,
                 statusCode = context.Response.StatusCode,
-                body = string.IsNullOrWhiteSpace(responseBody)
-                            ? null
-                            : JsonSerializer.Deserialize<object>(responseBody)
-            });
+                body = body
+            }), correlationId);
 
-            SafeLogger.Response(responseLog, correlationId);
-
-            // Write back to original stream
+            // -------- Send response back --------
             memStream.Position = 0;
             await memStream.CopyToAsync(originalBody);
         }
         catch (Exception ex)
         {
-            SafeLogger.Error(ex, "Unhandled error in CorrelationIdMiddleware", context);
-            throw; 
+            SafeLogger.Error(ex, "Middleware error", context);
+            throw;
         }
         finally
         {

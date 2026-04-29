@@ -29,7 +29,7 @@ public class ProviderFallbackService : IFallbackService
         _cacheService = cacheService;
     }
 
-    public async Task<(bool success, object? response, string providerName)> ExecuteAsync(string pan ,string correlationId)
+    public async Task<(bool success, object? response, string providerName)> FallbackAsync(string pan ,string correlationId)
     {
         SafeLogger.App("[START] ProviderFallbackService.ExecuteAsync");
 

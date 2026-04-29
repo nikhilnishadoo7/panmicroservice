@@ -77,7 +77,6 @@ public static class ProviderMapper
             client_id = e.ProviderRequestId,
             ProviderName = "Database",
 
-            // ✅ FIXED
             Status = e.PanLookUpStatus ?? "SUCCESS",
             Code = e.PanStatus ?? "VALID",
             Message = "Fetched from Database",

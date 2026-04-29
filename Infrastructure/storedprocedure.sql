@@ -1,8 +1,5 @@
 /*
 
-Database name - pan_verification2
-
-
 
 CREATE TABLE providerpanmaster (
     id BIGSERIAL PRIMARY KEY,
@@ -63,6 +60,7 @@ CREATE TABLE panresponsesjson (
         ON DELETE CASCADE
 );
 
+
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 
@@ -78,19 +76,30 @@ INSERT INTO providerpanmaster
 VALUES
 (
     'surepass',
-    'http://localhost:3001',
+    'https://kyc-api.surepass.io',
     '/api/v1/pan/pan-adv-v2',
-    'MOCK_TOKEN',
-    1
+    'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTY1ODkyMjkwNCwianRpIjoiNGFjZTdkZGItMDAwNi00NmNmLWFiYWYtNTc4OTI0YTg3ZjI3IiwidHlwZSI6ImFjY2VzcyIsImlkZW50aXR5IjoiZGV2LnBheXBvaW50aW5kaWFAc3VyZXBhc3MuaW8iLCJuYmYiOjE2NTg5MjI5MDQsImV4cCI6MTk3NDI4MjkwNCwidXNlcl9jbGFpbXMiOnsic2NvcGVzIjpbIndhbGxldCJdfX0.RBdnMnu1CIRb2flUzHNkzZYvOI-wN1CabDp_ZR4fXOQ',
+    2
 ),
 (
     'sprintverify',
     'http://localhost:3002',
     '/api/v1/sprintverify',
     'MOCK_TOKEN',
-    2
+    1
 );
 
+
+UPDATE providerpanmaster
+SET 
+    priority = 2,
+    encrypted_api_key = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTY1ODkyMjkwNCwianRpIjoiNGFjZTdkZGItMDAwNi00NmNmLWFiYWYtNTc4OTI0YTg3ZjI3IiwidHlwZSI6ImFjY2VzcyIsImlkZW50aXR5IjoiZGV2LnBheXBvaW50aW5kaWFAc3VyZXBhc3MuaW8iLCJuYmYiOjE2NTg5MjI5MDQsImV4cCI6MTk3NDI4MjkwNCwidXNlcl9jbGFpbXMiOnsic2NvcGVzIjpbIndhbGxldCJdfX0.RBdnMnu1CIRb2flUzHNkzZYvOI-wN1CabDp_ZR4fXOQ'
+WHERE provider_name = 'surepass';
+
+UPDATE providerpanmaster
+SET 
+    priority = 1
+WHERE provider_name = 'sprintverify';
 //--------------------------------------
 
 DROP PROCEDURE IF EXISTS insert_pan_verification;
@@ -108,7 +117,7 @@ CREATE OR REPLACE PROCEDURE insert_pan_verification(
     p_pancardtype VARCHAR,
     p_ispanaadhaarliked BOOLEAN,
     p_callerip VARCHAR,
-    p_createdat TIMESTAMPTZ   -- ✅ FIX HERE
+    p_createdat TIMESTAMPTZ   
 )
 LANGUAGE plpgsql
 AS $$
@@ -153,10 +162,6 @@ CREATE OR REPLACE PROCEDURE insert_pan_response(
     p_correlation_id VARCHAR,
     p_pan_verification_id UUID,
     p_request_id VARCHAR,
-    p_status INTEGER,
-    p_data_code VARCHAR,
-    p_response_timestamp TIMESTAMPTZ,
-    p_response_time_ms INTEGER,
     p_encrypted_raw_response_json TEXT,
     p_created_at TIMESTAMPTZ
 )
@@ -167,10 +172,6 @@ BEGIN
         correlation_id,
         pan_verification_id,
         request_id,
-        status,
-        data_code,
-        response_timestamp,
-        response_time_ms,
         encrypted_raw_response_json,
         created_at
     )
@@ -178,26 +179,120 @@ BEGIN
         p_correlation_id,
         p_pan_verification_id,
         p_request_id,
-        p_status,
-        p_data_code,
-        p_response_timestamp,
-        p_response_time_ms,
         p_encrypted_raw_response_json,
         p_created_at
     );
 END;
 $$;
+
+DROP FUNCTION IF EXISTS get_pan_with_provider(TEXT);
+
+CREATE OR REPLACE FUNCTION get_provider_name_by_hash(p_hash TEXT)
+RETURNS TEXT AS $$
+BEGIN
+    RETURN (
+        SELECT m.provider_name
+        FROM panverifications p
+        JOIN providerpanmaster m ON p.masterid = m.id
+        WHERE p.panhash = p_hash
+        LIMIT 1
+    );
+END;
+$$ LANGUAGE plpgsql;
+
+
+DROP PROCEDURE IF EXISTS insert_pan_verification(UUID, VARCHAR, BIGINT, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, BOOLEAN, VARCHAR, TIMESTAMPTZ);
+
+
+CREATE OR REPLACE FUNCTION insert_pan_verification(
+    p_id UUID,
+    p_correlationid VARCHAR,
+    p_masterid BIGINT,
+    p_providerrequestid VARCHAR,
+    p_panhash VARCHAR,
+    p_encryptedpan VARCHAR,
+    p_panstatus VARCHAR,
+    p_panlookupstatus VARCHAR,
+    p_encryptedfullname VARCHAR,
+    p_pancardtype VARCHAR,
+    p_ispanaadhaarliked BOOLEAN,
+    p_callerip VARCHAR,
+    p_createdat TIMESTAMPTZ
+)
+RETURNS UUID
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_id UUID;
+BEGIN
+    INSERT INTO panverifications (
+        id, correlationid, masterid, providerrequestid,
+        panhash, encryptedpan, panstatus, panlookupstatus,
+        encryptedfullname, pancardtype, ispanaadhaarliked,
+        callerip, createdat
+    )
+    VALUES (
+        p_id, p_correlationid, p_masterid, p_providerrequestid,
+        p_panhash, p_encryptedpan, p_panstatus, p_panlookupstatus,
+        p_encryptedfullname, p_pancardtype, p_ispanaadhaarliked,
+        p_callerip, p_createdat
+    )
+    ON CONFLICT (panhash) DO NOTHING;
+
+    SELECT id INTO v_id FROM panverifications WHERE panhash = p_panhash;
+    RETURN v_id;
+END;
+$$;
+
+SELECT 
+        id,
+        provider_name       AS ProviderName,
+        provider_baseurl    AS BaseUrl,
+        provider_endpoint   AS Endpoint,
+        encrypted_api_key   AS ApiKey,
+        priority            AS Priority,
+        is_active           AS IsActive
+    FROM providerpanmaster
+    WHERE is_active = true
+
+
+
+	CREATE OR REPLACE FUNCTION get_active_providers()
+RETURNS TABLE (
+    id                BIGINT,
+    providername VARCHAR,
+    baseurl VARCHAR,
+    endpoint VARCHAR,
+    apikey VARCHAR,
+    priority INTEGER,
+    isactive BOOLEAN
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        pm.id,
+        pm.provider_name AS providername,
+        pm.provider_baseurl AS baseurl,
+        pm.provider_endpoint AS endpoint,
+        pm.encrypted_api_key AS apikey,
+        pm.priority AS priority,
+        pm.is_active AS isactive
+    FROM providerpanmaster pm
+    WHERE pm.is_active = true
+    ORDER BY pm.priority ASC;
+END;
+$$;
 //--------------------------------
 
 
-DROP TABLE panresponsesjson;
-DROP TABLE panverifications;
-DROP TABLE providerpanmaster;
+-- DROP TABLE panresponsesjson;
+-- DROP TABLE panverifications;
+-- DROP TABLE providerpanmaster;
 
-
-DELETE FROM panverifications;
-
+-- TRUNCATE TABLE panverifications CASCADE;
 
 SELECT * FROM providerpanmaster;
 SELECT * FROM panresponsesjson;
-SELECT * FROM panverifications;
+SELECT * FROM panverifications;nverifications;

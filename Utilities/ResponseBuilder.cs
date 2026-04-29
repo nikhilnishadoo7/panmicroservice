@@ -86,7 +86,7 @@ public static class ResponseBuilder
         return Error("INTERNAL_SERVER_ERROR", "Something went wrong. Please try again.", correlationId, httpStatus: 500);
     }
 
-    // ─── PRIVATE BASE ────────────────────────────────────────
+
     public static ApiResponse<object> Error(
         string code,
         string message,

@@ -31,7 +31,7 @@ public class HealthController : ControllerBase
     }
 
     // ✅ Readiness (DB check)
-    [HttpGet("health/ready")]
+    [HttpGet("health/database")]
     public async Task<IActionResult> HealthReady()
     {
         SafeLogger.App("Health Ready Controller Hit");
