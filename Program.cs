@@ -1,6 +1,7 @@
 using Dapper;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.OpenApi.Models;
+using pan.Middleware;
 using PAN.API.Application.Services.Implementations;
 using PAN.API.Application.Services.Interfaces;
 using PAN.API.Configurations;
@@ -9,9 +10,12 @@ using PAN.API.Infrastructure.Providers.Implementations;
 using PAN.API.Infrastructure.Providers.Interfaces;
 using PAN.API.Infrastructure.Repositories.Implementations;
 using PAN.API.Infrastructure.Repositories.Interfaces;
+using PAN.API.Infrastructure.Resilience;
 using PAN.API.Middleware;
 using PAN.API.Utilities;
 using Serilog;
+
+LoggerConfig.ConfigureLogger();
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,8 +36,6 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
     });
 
-
-LoggerConfig.ConfigureLogger();
 builder.Host.UseSerilog();
 
 builder.Services.AddMemoryCache();
@@ -50,13 +52,20 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.Services.AddHttpClient("SurepassClient", client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(30);
-});
+    client.Timeout = TimeSpan.FromSeconds(10);
+})
+.AddPolicyHandler(PollyPolicies.GetRetryPolicy("SurePass"))
+.AddPolicyHandler(PollyPolicies.GetCircuitBreakerPolicy("SurePass"));
 
 builder.Services.AddHttpClient("SprintVerifyClient", client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(30);
-});
+    client.Timeout = TimeSpan.FromSeconds(10);
+})
+.AddPolicyHandler(PollyPolicies.GetRetryPolicy("SprintVerify"))
+.AddPolicyHandler(PollyPolicies.GetCircuitBreakerPolicy("SprintVerify"));
+
+builder.Services.AddScoped<ISurePassService, SurePassProvider>();
+builder.Services.AddScoped<ISprintVerifyService, SprintVerifyProvider>();
 
 
 builder.Services.AddSingleton<DapperContext>();
@@ -82,11 +91,9 @@ builder.Services.AddScoped<IFallbackService, ProviderFallbackService>();
 builder.Services.AddScoped<IPanVerificationService, PanVerificationService>();
 
 var app = builder.Build();
-
-// ✅ 1. Correlation FIRST
+app.UseMiddleware<GatewayAuthMiddleware>();
 app.UseMiddleware<CorrelationIdMiddleware>();
 
-// ✅ 2. Swagger BEFORE anything else
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {

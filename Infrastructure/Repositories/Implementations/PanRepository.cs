@@ -21,7 +21,7 @@ public class PanRepository : IPanRepository
 
         using var db = _context.CreateConnection();
 
-        // ✅ One query — returns full record + providername via JOIN
+        
         var result = await db.QueryFirstOrDefaultAsync<PanVerification>(
             "SELECT * FROM get_pan_with_provider(@hash)",
             new { hash }

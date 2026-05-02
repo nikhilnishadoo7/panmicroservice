@@ -16,7 +16,7 @@ public class HealthController : ControllerBase
         _healthService = healthService;
     }
 
-    // ✅ Liveness
+    
     [HttpGet("health")]
     public async Task<IActionResult> Health()
     {
@@ -24,13 +24,10 @@ public class HealthController : ControllerBase
 
         var result = await _healthService.GetHealthAsync();
 
-        // ✅ ADD RESPONSE LOG
-        SafeLogger.Response(JsonConvert.SerializeObject(result));
-
         return Ok(result);
     }
 
-    // ✅ Readiness (DB check)
+    
     [HttpGet("health/database")]
     public async Task<IActionResult> HealthReady()
     {
@@ -38,7 +35,7 @@ public class HealthController : ControllerBase
 
         var result = await _healthService.GetHealthReadyAsync();
 
-        // ✅ ADD RESPONSE LOG
+       
         SafeLogger.Response(JsonConvert.SerializeObject(result));
 
         if (result.Status == "Unhealthy")

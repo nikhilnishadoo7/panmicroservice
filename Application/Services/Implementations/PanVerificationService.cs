@@ -84,23 +84,23 @@ public class PanVerificationService : IPanVerificationService
             throw new AppException("MAPPING_FAILED", "Provider response mapping failed", 500);
 
         res.Source = "PROVIDER";
-        res.ProviderName = providerName;
+    
 
         SafeLogger.App($"Provider SUCCESS: {providerName}");
 
-        
-        var masterConfig = _cacheService.GetProviders()
-            .FirstOrDefault(x =>
-                x.ProviderName.Equals(providerName, StringComparison.OrdinalIgnoreCase));
+        SafeLogger.App("MAPPED RESPONSE DATA", new
+        {
+            MasterId = res.MasterId,
+            Pan = res.Pan,
+            FullName = res.FullName
+        });
 
-        if (masterConfig == null)
-            throw new AppException("CONFIG_ERROR", "Provider config not found in cache", 500);
+        //SafeLogger.App($"Inserting panverification: {entity.Id}");
 
-        
         var entity = new PanVerification
         {
             Id = Guid.NewGuid(),
-            MasterId = masterConfig.Id,           
+            MasterId = res.MasterId,
             ProviderRequestId = res.client_id,
             PanHash = hash,
             EncryptedPan = _encryptionService.Encrypt(res.Pan ?? string.Empty),
@@ -113,6 +113,13 @@ public class PanVerificationService : IPanVerificationService
             CallerIp = ip ?? "",
             CreatedAt = DateTime.UtcNow
         };
+        SafeLogger.App("MAPPED RESPONSE DATA", new
+        {
+            MasterId = res.MasterId,
+            RequestId = res.client_id,
+            Pan = res.Pan,
+            FullName = res.FullName
+        });
 
         SafeLogger.App($"Inserting panverification: {entity.Id}");
 

@@ -15,6 +15,5 @@ public class MetaInfo
 {
     public bool FallbackUsed { get; set; }
     public string? PrimaryProvider { get; set; }
-    public string? FallbackProvider { get; set; }
     public bool ProviderCacheHit { get; set; }
 }

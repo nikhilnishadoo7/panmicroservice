@@ -13,10 +13,8 @@ public class GlobalExceptionMiddleware
     {
         _next = next;
     }
-
     public async Task Invoke(HttpContext context)
     {
-
         var correlationId = context.Items["CorrelationId"]?.ToString() ?? "";
 
         try
@@ -25,7 +23,13 @@ public class GlobalExceptionMiddleware
         }
         catch (AppException ex)
         {
-            SafeLogger.Error(ex, ex.Message, context);
+            SafeLogger.Error(ex, ex.Message, new
+            {
+                path = context.Request.Path.ToString(),
+                method = context.Request.Method,
+                correlationId,
+                statusCode = ex.HttpStatus
+            });
 
             context.Response.StatusCode = ex.HttpStatus;
             context.Response.ContentType = "application/json";
@@ -38,7 +42,13 @@ public class GlobalExceptionMiddleware
         }
         catch (Exception ex)
         {
-            SafeLogger.Error(ex, "Unhandled exception occurred", context);
+            SafeLogger.Error(ex, "Unhandled exception occurred", new
+            {
+                path = context.Request.Path.ToString(),
+                method = context.Request.Method,
+                correlationId,
+                statusCode = 500
+            });
 
             context.Response.StatusCode = 500;
             context.Response.ContentType = "application/json";

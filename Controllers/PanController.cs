@@ -18,7 +18,6 @@ public class PanController : ControllerBase
     }
     [HttpPost("verify")]
     public async Task<IActionResult> Verify([FromBody] PanRequest? request)
-    
     {
         var correlationId = HttpContext.Items["CorrelationId"]?.ToString();
 

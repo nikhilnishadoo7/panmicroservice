@@ -1,6 +1,7 @@
 ﻿using System.Text;
 using System.Text.Json;
 using PAN.API.Infrastructure.Logging;
+using PAN.API.Utilities;
 
 namespace PAN.API.Middleware;
 
@@ -22,7 +23,6 @@ public class CorrelationIdMiddleware
             var correlationId = Guid.NewGuid().ToString();
             context.Items["CorrelationId"] = correlationId;
 
-            // -------- Read Request --------
             context.Request.EnableBuffering();
 
             string requestBody = "";
@@ -40,29 +40,16 @@ public class CorrelationIdMiddleware
                 context.Request.Body.Position = 0;
             }
 
-            object? requestData = null;
+            string maskedBody = MaskingHelper.MaskSensitiveData(requestBody);
 
-            if (!string.IsNullOrWhiteSpace(requestBody))
+            SafeLogger.Request(new
             {
-                try
-                {
-                    requestData = JsonSerializer.Deserialize<object>(requestBody);
-                }
-                catch
-                {
-                    requestData = requestBody;
-                }
-            }
-
-            SafeLogger.Request(JsonSerializer.Serialize(new
-            {
-                correlationId,
-                endpoint = context.Request.Path.Value,
                 method = context.Request.Method,
-                body = requestData
-            }), correlationId);
+                path = context.Request.Path,
+                correlationId,
+                body = string.IsNullOrWhiteSpace(maskedBody) ? null : maskedBody
+            });
 
-            // -------- Capture Response --------
             originalBody = context.Response.Body;
 
             using var memStream = new MemoryStream();
@@ -70,30 +57,27 @@ public class CorrelationIdMiddleware
 
             await _next(context);
 
-            // -------- Read Response --------
             memStream.Position = 0;
             var responseBody = await new StreamReader(memStream).ReadToEndAsync();
 
             object? body = null;
 
-            if (!string.IsNullOrWhiteSpace(responseBody))
+            if (!string.IsNullOrWhiteSpace(responseBody) &&
+                context.Response.ContentType?.Contains("application/json") == true &&
+                responseBody.Length < 5000)
             {
-                if (context.Response.ContentType != null &&
-                    context.Response.ContentType.Contains("application/json"))
+                try
                 {
-                    try
-                    {
-                        body = JsonSerializer.Deserialize<object>(responseBody);
-                    }
-                    catch
-                    {
-                        body = responseBody; // fallback
-                    }
+                    body = JsonSerializer.Deserialize<JsonElement>(responseBody);
                 }
-                else
+                catch
                 {
-                    body = responseBody; // keep as string
+                    body = "[non-json response]";
                 }
+            }
+            else if (responseBody.Length >= 5000)
+            {
+                body = $"[response too large to log: {responseBody.Length} chars]";
             }
 
             SafeLogger.Response(JsonSerializer.Serialize(new
@@ -101,15 +85,20 @@ public class CorrelationIdMiddleware
                 correlationId,
                 statusCode = context.Response.StatusCode,
                 body = body
-            }), correlationId);
+            }));
 
-            // -------- Send response back --------
             memStream.Position = 0;
             await memStream.CopyToAsync(originalBody);
         }
         catch (Exception ex)
         {
-            SafeLogger.Error(ex, "Middleware error", context);
+            SafeLogger.Error(ex, "Middleware error", new
+            {
+                path = context.Request.Path.ToString(),
+                method = context.Request.Method,
+                correlationId = context.Items["CorrelationId"]?.ToString(),
+                statusCode = context.Response?.StatusCode
+            });
             throw;
         }
         finally

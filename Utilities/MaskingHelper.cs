@@ -1,6 +1,6 @@
 ﻿using System.Text.RegularExpressions;
 
-namespace PAN.API.Infrastructure.Logging;
+namespace PAN.API.Utilities;
 
 public static class MaskingHelper
 {

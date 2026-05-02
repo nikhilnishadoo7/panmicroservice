@@ -43,16 +43,15 @@ public static class ProviderMapper
         return new PanCommonResponseDto
         {
             IsSuccess = dto.status == "SUCCESS",
-
-            Pan = dto.data?.Pan,
+            Pan = dto.data?.idNumber,
             FullName = dto.data?.fullName,
             PanStatus = dto.data?.panStatus,
             Category = "Individual",
 
             AadhaarLinked = dto.data?.aadhaarSeedingStatus == "Successful",
 
-            ProviderName = "SprintVerify",
-
+            ProviderName ="SprintVerify",
+            client_id = dto.requestId,
             Status = dto.status,
             Code = dto.data?.idStatus,
             Message = "Processed by PAN.API",

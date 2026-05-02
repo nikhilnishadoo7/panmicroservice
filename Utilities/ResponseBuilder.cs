@@ -20,7 +20,6 @@ public static class ResponseBuilder
             {
                 FallbackUsed = res.FallbackUsed,
                 PrimaryProvider = res.PrimaryProvider,
-                FallbackProvider = res.FallbackProvider,
                 ProviderCacheHit = res.ProviderCacheHit
             },
             Data = new
@@ -50,7 +49,6 @@ public static class ResponseBuilder
             {
                 FallbackUsed = res.FallbackUsed,
                 PrimaryProvider = res.PrimaryProvider,
-                FallbackProvider = res.FallbackProvider
             },
             Data = new
             {

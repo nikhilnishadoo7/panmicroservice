@@ -29,67 +29,41 @@ public class ProviderFallbackService : IFallbackService
         _cacheService = cacheService;
     }
 
-    public async Task<(bool success, object? response, string providerName)> FallbackAsync(string pan ,string correlationId)
+    public async Task<(bool success, object? response, string providerName)> FallbackAsync(
+        string pan,
+        string correlationId)
     {
-        SafeLogger.App("[START] ProviderFallbackService.ExecuteAsync");
+        var providers = _cacheService.GetProviders();
 
-        var masters = _cacheService.GetProviders();
-        bool fromCache = masters.Any();
+        if (!providers.Any())
+            providers = await _masterRepository.GetAllActiveProviders();
 
-        if (!fromCache)
-        {
-            SafeLogger.App("Provider Cache MISS — fetching from DB");
-            masters = await _masterRepository.GetAllActiveProviders();
-            _cacheService.SetProviders(masters);
-        }
-        else
-        {
-            SafeLogger.App($"Provider Cache HIT — {masters.Count} providers, no DB call");
-        }
-
-        if (!masters.Any())
-            throw new AppException("PROVIDER_FAILURE", "No providers configured", 500);
-
-        var orderedProviders = masters
+        var ordered = providers
             .Where(x => x.IsActive)
             .OrderBy(x => x.Priority)
             .ToList();
 
-        string lastProvider = orderedProviders.First().ProviderName;
-
-       
-        foreach (var master in orderedProviders)
+        foreach (var master in ordered)
         {
-            SafeLogger.App($"Trying: {master.ProviderName}");
-
             try
             {
+                SafeLogger.App($"Trying: {master.ProviderName}");
 
-
-                var (response, raw) = master.ProviderName.ToLower() switch
+                var result = master.ProviderName.ToLower() switch
                 {
                     "surepass" => await _surePass.SurePassVerifyAsync(pan, master, correlationId),
                     "sprintverify" => await _sprintVerify.SprintVerifyAsync(pan, master, correlationId),
-                    _ => throw new Exception($"Unknown provider: {master.ProviderName}")
+                    _ => throw new Exception("Unknown provider")
                 };
-
-                response.MasterId = master.Id;
-                response.ProviderCacheHit = fromCache;
-
-                lastProvider = master.ProviderName;
-
-                SafeLogger.App($"Provider SUCCESS: {master.ProviderName}");
-                return (true, response, lastProvider);
+                result.response.MasterId = master.Id;
+                return (true, result.response, master.ProviderName);
             }
             catch (Exception ex)
             {
-                lastProvider = master.ProviderName;
-                SafeLogger.Error(ex, $"Provider FAILED: {master.ProviderName}");
-              
+                SafeLogger.Error(ex, $"FAILED: {master.ProviderName}");
             }
         }
 
-        SafeLogger.App("All providers FAILED");
-        return (false, null, lastProvider);
+        return (false, null, "NONE");
     }
 }

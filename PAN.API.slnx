@@ -1,3 +1,4 @@
 <Solution>
+  <Project Path="../PAN.API.XunitTesting/PAN.API.XunitTesting.csproj" Id="88c0446f-e182-463f-ae3d-e872fb3ad236" />
   <Project Path="PAN.API.csproj" />
 </Solution>

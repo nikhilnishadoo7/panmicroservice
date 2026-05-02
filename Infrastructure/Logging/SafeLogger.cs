@@ -2,80 +2,33 @@
 using Serilog;
 using System.Runtime.CompilerServices;
 
+using Serilog;
+
+namespace PAN.API.Infrastructure.Logging;
+
 public static class SafeLogger
 {
-    
-    public static void Request(string message, string correlationId = "")
+    public static void App(string eventName, object? data = null)
     {
-        Log.ForContext("LogType", "REQUEST")
-                           .Information($@"
-                ----- REQUEST START -----
-                CorrelationId : {correlationId}
-
-                {MaskingHelper.MaskSensitiveData(message)}
-
-                ----- REQUEST END -----
-                ");
-     }
-
-    
-    public static void Response(string message, string correlationId = "")
-    {
-        Log.ForContext("LogType", "RESPONSE")
-                           .Information($@"
-                ----- RESPONSE START -----
-                CorrelationId : {correlationId}
-
-                {MaskingHelper.MaskSensitiveData(message)}
-
-                ----- RESPONSE END -----
-                ");
+        Log.ForContext("LogType", "APP", destructureObjects: false)
+           .Information("{event_name} {@Data}", eventName, data);
     }
 
-    
-    public static void Error(
-        Exception ex,
-        string message,
-        HttpContext? context = null,
-        [CallerFilePath] string file = "",
-        [CallerLineNumber] int line = 0)
+    public static void Request(object data)
     {
-        var endpoint = context?.Request?.Path;
-        var method = context?.Request?.Method;
+        Log.ForContext("LogType", "REQUEST", false)
+           .Information("REQUEST {@Data}", data);
+    }
 
-        Log.ForContext("LogType", "ERROR")
-                               .Error($@"
-                    ===== ERROR START =====
-
-                    Message   : {MaskingHelper.MaskSensitiveData(message)}
-                    Endpoint  : {endpoint}
-                    Method    : {method}
-
-                    File      : {Path.GetFileName(file)}
-                    Line      : {line}
-
-                    Exception : {ex.Message}
-
-                    StackTrace:
-                    {ex.StackTrace}
-
-                    ===== ERROR END =====
-                    ");
-                        }
-
-    
-    public static void App(
-        string message,
-        [CallerFilePath] string file = "",
-        [CallerLineNumber] int line = 0)
+    public static void Response(object data)
     {
-        Log.ForContext("LogType", "APP")
-                               .Information($@"
-                                ===== [APP FLOW] =====
-                
-                    File : {Path.GetFileName(file)}
-                    Line : {line}
-                    Message : {MaskingHelper.MaskSensitiveData(message)}
-                    ");
+        Log.ForContext("LogType", "RESPONSE", false)
+           .Information("RESPONSE {@Data}", data);
+    }
+
+    public static void Error(Exception ex, string eventName, object? data = null)
+    {
+        Log.ForContext("LogType", "ERROR", false)
+           .Error(ex, "{event_name} {@Data}", eventName, data);
     }
 }

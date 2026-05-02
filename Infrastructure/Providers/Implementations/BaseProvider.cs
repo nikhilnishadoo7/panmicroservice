@@ -14,7 +14,6 @@ public abstract class BaseProvider
         _client = factory.CreateClient(clientName);
     }
 
-    // ✅ One shared method — both providers call this
     protected async Task<string> PostAsync(
         string baseUrl,
         string endpoint,
@@ -34,20 +33,20 @@ public abstract class BaseProvider
         request.Headers.Add("X-Request-Id", correlationId);
 
         var json = JsonConvert.SerializeObject(payload);
-        SafeLogger.App($"[HTTP POST] Payload: {json}");
-
         request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        SafeLogger.App($"[HTTP POST] Payload: {json}");
 
         var res = await _client.SendAsync(request);
 
         SafeLogger.App($"[HTTP POST] Status: {res.StatusCode}");
 
+        // ✅ CRITICAL FIX → enables Polly retry
+        res.EnsureSuccessStatusCode();
+
         var responseJson = await res.Content.ReadAsStringAsync();
 
         SafeLogger.App($"[HTTP POST] Raw Response: {responseJson}");
-
-        if (!res.IsSuccessStatusCode)
-            throw new Exception($"Provider call failed [{res.StatusCode}]: {responseJson}");
 
         return responseJson;
     }

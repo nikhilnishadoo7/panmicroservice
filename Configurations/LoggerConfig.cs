@@ -8,58 +8,62 @@ public static class LoggerConfig
     public static void ConfigureLogger()
     {
         Log.Logger = new LoggerConfiguration()
-            .MinimumLevel.Information()
+            .MinimumLevel.Debug()
+            .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
             .Enrich.FromLogContext()
 
-           
             .WriteTo.Console()
 
-            
+            // ✅ APP logs
             .WriteTo.Logger(lc => lc
                 .Filter.ByIncludingOnly(e =>
-                    e.Properties.ContainsKey("LogType") &&
-                    e.Properties["LogType"].ToString().Trim('"') == "APP")
-                .WriteTo.File(LogPathHelper.GetPath("application"),
+                    e.Properties.TryGetValue("LogType", out var val) &&
+                    val.ToString().Trim('"') == "APP")
+                .WriteTo.File(
+                    path: LogPathHelper.GetPath("APP"),
                     rollingInterval: RollingInterval.Infinite,
-                    fileSizeLimitBytes: 10 * 1024 * 1024,
-                    rollOnFileSizeLimit: true,
-                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} | {Message}{NewLine}")
+                    shared: true,
+                    buffered: false
+                )
             )
 
-           
+            // ✅ REQUEST logs
             .WriteTo.Logger(lc => lc
                 .Filter.ByIncludingOnly(e =>
-                    e.Properties.ContainsKey("LogType") &&
-                    e.Properties["LogType"].ToString().Trim('"') == "REQUEST")
-                .WriteTo.File(LogPathHelper.GetPath("request"),
+                    e.Properties.TryGetValue("LogType", out var val) &&
+                    val.ToString().Trim('"') == "REQUEST")
+                .WriteTo.File(
+                    path: LogPathHelper.GetPath("REQUEST"),
                     rollingInterval: RollingInterval.Infinite,
-                    fileSizeLimitBytes: 10 * 1024 * 1024,
-                    rollOnFileSizeLimit: true,
-                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} | {Message}{NewLine}")
+                    shared: true,
+                    buffered: false
+                )
             )
 
-            
+            // ✅ RESPONSE logs
             .WriteTo.Logger(lc => lc
                 .Filter.ByIncludingOnly(e =>
-                    e.Properties.ContainsKey("LogType") &&
-                    e.Properties["LogType"].ToString().Trim('"') == "RESPONSE")
-                .WriteTo.File(LogPathHelper.GetPath("response"),
+                    e.Properties.TryGetValue("LogType", out var val) &&
+                    val.ToString().Trim('"') == "RESPONSE")
+                .WriteTo.File(
+                    path: LogPathHelper.GetPath("RESPONSE"),
                     rollingInterval: RollingInterval.Infinite,
-                    fileSizeLimitBytes: 10 * 1024 * 1024,
-                    rollOnFileSizeLimit: true,
-                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} | {Message}{NewLine}")
+                    shared: true,
+                    buffered: false
+                )
             )
 
-           
+            // ✅ ERROR logs
             .WriteTo.Logger(lc => lc
-                .Filter.ByIncludingOnly(e => 
-                    e.Properties.ContainsKey("LogType") &&
-                    e.Properties["LogType"].ToString().Trim('"') == "ERROR")
-                .WriteTo.File(LogPathHelper.GetPath("error"),
+                .Filter.ByIncludingOnly(e =>
+                    e.Properties.TryGetValue("LogType", out var val) &&
+                    val.ToString().Trim('"') == "ERROR")
+                .WriteTo.File(
+                    path: LogPathHelper.GetPath("ERROR"),
                     rollingInterval: RollingInterval.Infinite,
-                    fileSizeLimitBytes: 10 * 1024 * 1024,
-                    rollOnFileSizeLimit: true,
-                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} | {Message}{NewLine}{Exception}")
+                    shared: true,
+                    buffered: false
+                )
             )
 
             .CreateLogger();

@@ -25,5 +25,4 @@ public class PanCommonResponseDto
     
     public bool FallbackUsed { get; set; } = false;
     public string? PrimaryProvider { get; set; }
-    public string? FallbackProvider { get; set; }
 }
