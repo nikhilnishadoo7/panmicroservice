@@ -99,7 +99,7 @@ public class PanVerificationService : IPanVerificationService
 
         var entity = new PanVerification
         {
-            Id = Guid.NewGuid(),
+            
             MasterId = res.MasterId,
             ProviderRequestId = res.client_id,
             PanHash = hash,
@@ -123,14 +123,14 @@ public class PanVerificationService : IPanVerificationService
 
         SafeLogger.App($"Inserting panverification: {entity.Id}");
 
-        
-        var savedId = await _panRepository.Insert(entity);
+
+        long savedId = await _panRepository.Insert(entity);
 
         
         var rawEntity = new PanResponseJson
         {
             CorrelationId = correlationId ?? "",
-            PanVerificationId = savedId,             
+            PanVerificationId = savedId,
             RequestId = res.client_id,
             EncryptedRawResponseJson = _encryptionService.Encrypt(
                                            JsonConvert.SerializeObject(response)),

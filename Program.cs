@@ -91,7 +91,7 @@ builder.Services.AddScoped<IFallbackService, ProviderFallbackService>();
 builder.Services.AddScoped<IPanVerificationService, PanVerificationService>();
 
 var app = builder.Build();
-app.UseMiddleware<GatewayAuthMiddleware>();
+//app.UseMiddleware<GatewayAuthMiddleware>();
 app.UseMiddleware<CorrelationIdMiddleware>();
 
 app.UseSwagger();

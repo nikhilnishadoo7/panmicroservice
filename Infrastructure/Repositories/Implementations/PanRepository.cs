@@ -34,12 +34,12 @@ public class PanRepository : IPanRepository
         return result;
     }
 
-    public async Task<Guid> Insert(PanVerification e)
+    public async Task<long> Insert(PanVerification e)
     {
         SafeLogger.App($"DB INSERT START | Id: {e.Id}");
 
         var sql = @"SELECT insert_pan_verification(
-            @Id, @CorrelationId, @MasterId, @ProviderRequestId,
+                 @CorrelationId, @MasterId, @ProviderRequestId,
             @PanHash, @EncryptedPan, @PanStatus, @PanLookUpStatus,
             @EncryptedFullName, @PanCardType, @IsPanAadhaarLinked,
             @CallerIp, @CreatedAt
@@ -50,9 +50,8 @@ public class PanRepository : IPanRepository
         try
         {
             // ✅ Returns real DB id — new or existing
-            var actualId = await db.ExecuteScalarAsync<Guid>(sql, new
+            var actualId = await db.ExecuteScalarAsync<long>(sql, new
             {
-                e.Id,
                 e.CorrelationId,
                 e.MasterId,
                 e.ProviderRequestId,

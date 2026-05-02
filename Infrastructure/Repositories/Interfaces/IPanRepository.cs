@@ -7,5 +7,5 @@ namespace PAN.API.Infrastructure.Repositories.Interfaces;
 public interface IPanRepository
 {
     Task<PanVerification?> GetByHash(string hash);
-    Task<Guid> Insert(PanVerification entity);
+    Task<long> Insert(PanVerification entity);
 }

@@ -4,7 +4,7 @@
 
     public string CorrelationId { get; set; }
 
-    public Guid PanVerificationId { get; set; }
+    public long PanVerificationId { get; set; }
 
     public string RequestId { get; set; }                  
 
