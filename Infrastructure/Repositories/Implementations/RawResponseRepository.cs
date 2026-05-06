@@ -15,36 +15,45 @@ public class RawResponseRepository : IRawResponseRepository
         _context = context;
     }
 
+    // ✅ TESTABLE QUERY
+
+    protected virtual string InsertQuery()
+    {
+        return
+        @"CALL insert_pan_response(
+              @PanVerificationId,
+              @RequestId,
+              @EncryptedRawResponseJson,
+              @CreatedAt
+          );";
+    }
+
     public async Task InsertAsync(PanResponseJson e)
     {
-        SafeLogger.App($"RAW INSERT START | VerificationId: {e.PanVerificationId}");
-
-        var sql = @"CALL insert_pan_response(
-                @CorrelationId,
-                @PanVerificationId,
-                @RequestId,
-                @EncryptedRawResponseJson,
-                @CreatedAt
-            );";
+        SafeLogger.App(
+            $"RAW INSERT START | VerificationId: {e.PanVerificationId}");
 
         using var db = _context.CreateConnection();
 
         try
         {
-            await db.ExecuteAsync(sql, new
-            {
-                e.CorrelationId,
-                e.PanVerificationId,
-                e.RequestId,
-                e.EncryptedRawResponseJson,
-                e.CreatedAt
-            });
+            await db.ExecuteAsync(
+                InsertQuery(),
+                new
+                {
+                    e.PanVerificationId,
+                    e.RequestId,
+                    e.EncryptedRawResponseJson,
+                    e.CreatedAt
+                });
 
             SafeLogger.App("RAW INSERT SUCCESS");
         }
         catch (Exception ex)
         {
-            SafeLogger.App($"RAW INSERT FAILED: {ex.Message}");
+            SafeLogger.App(
+                $"RAW INSERT FAILED: {ex.Message}");
+
             throw;
         }
     }

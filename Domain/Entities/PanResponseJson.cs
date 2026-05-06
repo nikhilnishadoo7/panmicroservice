@@ -1,8 +1,8 @@
-﻿public class PanResponseJson
+﻿namespace PAN.API.Domain.Entities;
+
+public class PanResponseJson
 {
     public long Id { get; set; }
-
-    public string CorrelationId { get; set; }
 
     public long PanVerificationId { get; set; }
 

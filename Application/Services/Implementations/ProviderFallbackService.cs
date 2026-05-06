@@ -1,6 +1,4 @@
-﻿using System.Text;
-using System.Text.Json;
-using PAN.API.Application.DTOs.Common;
+﻿using PAN.API.Application.DTOs.Common;
 using PAN.API.Application.Services.Interfaces;
 using PAN.API.Domain.Entities;
 using PAN.API.Infrastructure.Logging;
@@ -33,37 +31,78 @@ public class ProviderFallbackService : IFallbackService
         string pan,
         string correlationId)
     {
-        var providers = _cacheService.GetProviders();
+        SafeLogger.App("[START] ProviderFallbackService.FallbackAsync");
 
-        if (!providers.Any())
+        var providers = _cacheService.GetProviders() ?? new List<providerpanmaster>();
+        bool fromCache = providers.Any();
+
+        // 🔹 Cache miss → DB
+        if (!fromCache)
+        {
+            SafeLogger.App("Cache MISS → Fetching providers from DB");
+
             providers = await _masterRepository.GetAllActiveProviders();
 
-        var ordered = providers
+            if (providers == null || !providers.Any())
+                throw new AppException("PROVIDER_FAILURE", "No providers configured", 500);
+
+            _cacheService.SetProviders(providers);
+        }
+
+        // 🔹 Order providers
+        var orderedProviders = providers
             .Where(x => x.IsActive)
             .OrderBy(x => x.Priority)
             .ToList();
 
-        foreach (var master in ordered)
+        if (!orderedProviders.Any())
+            throw new AppException("PROVIDER_FAILURE", "No active providers", 500);
+
+        string primaryProvider = orderedProviders.First().ProviderName.ToLower();
+        string lastProvider = primaryProvider;
+
+        bool isFirst = true;
+
+        // 🔹 Try providers
+        foreach (var master in orderedProviders)
         {
             try
             {
-                SafeLogger.App($"Trying: {master.ProviderName}");
+                var providerName = master.ProviderName.ToLower();
 
-                var result = master.ProviderName.ToLower() switch
+                var (response, raw) = providerName switch
                 {
                     "surepass" => await _surePass.SurePassVerifyAsync(pan, master, correlationId),
                     "sprintverify" => await _sprintVerify.SprintVerifyAsync(pan, master, correlationId),
-                    _ => throw new Exception("Unknown provider")
+                    _ => throw new Exception($"Unknown provider: {providerName}")
                 };
-                result.response.MasterId = master.Id;
-                return (true, result.response, master.ProviderName);
+
+                if (response == null || !response.IsSuccess)
+                {
+                    isFirst = false;
+                    continue;
+                }
+
+                // ✅ SUCCESS RESPONSE ENRICHMENT
+                response.MasterId = master.Id;
+                response.ProviderCacheHit = fromCache;
+                response.FallbackUsed = !isFirst;
+                response.PrimaryProvider = primaryProvider;
+                response.ProviderName = providerName;
+
+                return (true, response, providerName);
             }
             catch (Exception ex)
             {
-                SafeLogger.Error(ex, $"FAILED: {master.ProviderName}");
+                SafeLogger.Error(ex, $"FAILED → {master.ProviderName}");
             }
+
+            isFirst = false;
+            lastProvider = master.ProviderName.ToLower();
         }
 
-        return (false, null, "NONE");
+        SafeLogger.App("All providers FAILED");
+
+        return (false, null, lastProvider);
     }
 }

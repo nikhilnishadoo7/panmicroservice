@@ -1,8 +1,10 @@
-﻿using Serilog;
+﻿using System.Diagnostics.CodeAnalysis;
+using Serilog;
 using Serilog.Events;
 
 namespace PAN.API.Configurations;
 
+[ExcludeFromCodeCoverage]
 public static class LoggerConfig
 {
     public static void ConfigureLogger()
@@ -14,7 +16,7 @@ public static class LoggerConfig
 
             .WriteTo.Console()
 
-            // ✅ APP logs
+            
             .WriteTo.Logger(lc => lc
                 .Filter.ByIncludingOnly(e =>
                     e.Properties.TryGetValue("LogType", out var val) &&
@@ -27,7 +29,7 @@ public static class LoggerConfig
                 )
             )
 
-            // ✅ REQUEST logs
+            
             .WriteTo.Logger(lc => lc
                 .Filter.ByIncludingOnly(e =>
                     e.Properties.TryGetValue("LogType", out var val) &&
@@ -40,7 +42,7 @@ public static class LoggerConfig
                 )
             )
 
-            // ✅ RESPONSE logs
+            
             .WriteTo.Logger(lc => lc
                 .Filter.ByIncludingOnly(e =>
                     e.Properties.TryGetValue("LogType", out var val) &&
@@ -53,7 +55,7 @@ public static class LoggerConfig
                 )
             )
 
-            // ✅ ERROR logs
+            
             .WriteTo.Logger(lc => lc
                 .Filter.ByIncludingOnly(e =>
                     e.Properties.TryGetValue("LogType", out var val) &&

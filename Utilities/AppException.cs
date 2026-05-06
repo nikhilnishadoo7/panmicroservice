@@ -3,9 +3,13 @@
 public class AppException : Exception
 {
     public string Code { get; }
+
     public int HttpStatus { get; }
 
-    public AppException(string code, string message, int httpStatus = 400)
+    public AppException(
+        string code,
+        string message,
+        int httpStatus = 400)
         : base(message)
     {
         Code = code;

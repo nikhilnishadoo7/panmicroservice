@@ -4,8 +4,6 @@ public class PanVerification
 {
     public long Id { get; set; }
 
-    public string CorrelationId { get; set; }
-
     public long MasterId { get; set; }   
 
     public string? ProviderRequestId { get; set; }
