@@ -41,7 +41,6 @@ public abstract class BaseProvider
 
         SafeLogger.App($"[HTTP POST] Status: {res.StatusCode}");
 
-        // ✅ CRITICAL FIX → enables Polly retry
         res.EnsureSuccessStatusCode();
 
         var responseJson = await res.Content.ReadAsStringAsync();

@@ -1,9 +1,11 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using Dapper;
+﻿using Dapper;
 using PAN.API.Domain.Entities;
 using PAN.API.Infrastructure.Dapper;
 using PAN.API.Infrastructure.Logging;
 using PAN.API.Infrastructure.Repositories.Interfaces;
+using System.Data;
+using System.Data.Common;
+using System.Diagnostics.CodeAnalysis;
 
 namespace PAN.API.Infrastructure.Repositories.Implementations;
 
@@ -17,86 +19,93 @@ public class PanRepository : IPanRepository
         _context = context;
     }
 
-    protected virtual string GetByHashQuery()
-    {
-        return
-            "SELECT * FROM get_pan_with_provider(@hash)";
-    }
+    protected virtual string GetByHashProc() => "sp_get_pan_with_provider";
+    protected virtual string InsertProc() => "sp_insert_pan_verification";
 
-    protected virtual string InsertQuery()
-    {
-        return
-        @"SELECT insert_pan_verification(
-              @MasterId,
-              @ProviderRequestId,
-              @PanHash,
-              @EncryptedPan,
-              @PanStatus,
-              @PanLookUpStatus,
-              @EncryptedFullName,
-              @PanCardType,
-              @IsPanAadhaarLinked,
-              @CallerIp,
-              @CreatedAt
-          );";
-    }
-
+    // ----------------------------------------------------------------
+    // GET BY HASH
+    // ----------------------------------------------------------------
     public async Task<PanVerification?> GetByHash(string hash)
     {
         SafeLogger.App($"DB FETCH START | Hash: {hash}");
 
-        using var db = _context.CreateConnection();
+        using var db = (DbConnection)_context.CreateConnection(); // ✅ cast to DbConnection
+        await db.OpenAsync();
 
-        var result =
-            await db.QueryFirstOrDefaultAsync<PanVerification>(
-                GetByHashQuery(),
-                new { hash });
+        using var transaction = await db.BeginTransactionAsync();
 
-        SafeLogger.App(
-            result != null &&
-            !string.IsNullOrEmpty(result.PanHash)
-                ? "DB FETCH HIT"
-                : "DB FETCH MISS");
+        try
+        {
+            const string cursorName = "pan_provider_cur";
 
-        return result;
+            await db.ExecuteAsync(
+                $"CALL {GetByHashProc()}(@hash, '{cursorName}')",
+                new { hash },
+                transaction: transaction
+            );
+
+            var result = await db.QueryFirstOrDefaultAsync<PanVerification>(
+                $"FETCH ALL FROM {cursorName}",
+                transaction: transaction
+            );
+
+            await transaction.CommitAsync();
+
+            SafeLogger.App(
+                result != null && !string.IsNullOrEmpty(result.PanHash)
+                    ? "DB FETCH HIT"
+                    : "DB FETCH MISS");
+
+            return result;
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task<long> Insert(PanVerification e)
     {
-        SafeLogger.App($"DB INSERT START | Id: {e.Id}");
+        SafeLogger.App($"DB INSERT START | Hash: {e.PanHash}");
 
-        using var db = _context.CreateConnection();
+        using var db = (DbConnection)_context.CreateConnection(); // ✅ cast to DbConnection
+        await db.OpenAsync();
 
         try
         {
-            var actualId =
-                await db.ExecuteScalarAsync<long>(
-                    InsertQuery(),
-                    new
-                    {
-                        e.MasterId,
-                        e.ProviderRequestId,
-                        e.PanHash,
-                        e.EncryptedPan,
-                        e.PanStatus,
-                        e.PanLookUpStatus,
-                        e.EncryptedFullName,
-                        e.PanCardType,
-                        e.IsPanAadhaarLinked,
-                        e.CallerIp,
-                        e.CreatedAt
-                    });
+            var p = new DynamicParameters();
+            p.Add("p_masterid", e.MasterId);
+            p.Add("p_providerrequestid", e.ProviderRequestId);
+            p.Add("p_panhash", e.PanHash);
+            p.Add("p_encryptedpan", e.EncryptedPan);
+            p.Add("p_panstatus", e.PanStatus);
+            p.Add("p_panlookupstatus", e.PanLookUpStatus);
+            p.Add("p_encryptedfullname", e.EncryptedFullName);
+            p.Add("p_pancardtype", e.PanCardType);
+            p.Add("p_ispanaadhaarliked", e.IsPanAadhaarLinked);
+            p.Add("p_callerip", e.CallerIp);
+            p.Add("p_createdat", e.CreatedAt);
+            p.Add("p_out_id",
+                  value: null,
+                  dbType: DbType.Int64,
+                  direction: ParameterDirection.InputOutput);
 
-            SafeLogger.App(
-                $"DB INSERT SUCCESS | ActualId: {actualId}");
+            await db.ExecuteAsync(
+                $"CALL {InsertProc()}(" +
+                "@p_masterid, @p_providerrequestid, @p_panhash, @p_encryptedpan, " +
+                "@p_panstatus, @p_panlookupstatus, @p_encryptedfullname, @p_pancardtype, " +
+                "@p_ispanaadhaarliked, @p_callerip, @p_createdat, @p_out_id)",
+                p
+            );
 
+            var actualId = p.Get<long>("p_out_id");
+            SafeLogger.App($"DB INSERT SUCCESS | ActualId: {actualId}");
             return actualId;
         }
         catch (Exception ex)
         {
-            SafeLogger.App(
-                $"DB INSERT FAILED: {ex.Message}");
-
+            SafeLogger.App($"DB INSERT FAILED: {ex.Message}");
             throw;
         }
     }

@@ -36,7 +36,6 @@ public class ProviderFallbackService : IFallbackService
         var providers = _cacheService.GetProviders() ?? new List<providerpanmaster>();
         bool fromCache = providers.Any();
 
-        // 🔹 Cache miss → DB
         if (!fromCache)
         {
             SafeLogger.App("Cache MISS → Fetching providers from DB");
@@ -49,7 +48,7 @@ public class ProviderFallbackService : IFallbackService
             _cacheService.SetProviders(providers);
         }
 
-        // 🔹 Order providers
+        
         var orderedProviders = providers
             .Where(x => x.IsActive)
             .OrderBy(x => x.Priority)
@@ -63,7 +62,6 @@ public class ProviderFallbackService : IFallbackService
 
         bool isFirst = true;
 
-        // 🔹 Try providers
         foreach (var master in orderedProviders)
         {
             try
@@ -83,7 +81,6 @@ public class ProviderFallbackService : IFallbackService
                     continue;
                 }
 
-                // ✅ SUCCESS RESPONSE ENRICHMENT
                 response.MasterId = master.Id;
                 response.ProviderCacheHit = fromCache;
                 response.FallbackUsed = !isFirst;

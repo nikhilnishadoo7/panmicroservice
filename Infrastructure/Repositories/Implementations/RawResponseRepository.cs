@@ -15,18 +15,7 @@ public class RawResponseRepository : IRawResponseRepository
         _context = context;
     }
 
-    // ✅ TESTABLE QUERY
-
-    protected virtual string InsertQuery()
-    {
-        return
-        @"CALL insert_pan_response(
-              @PanVerificationId,
-              @RequestId,
-              @EncryptedRawResponseJson,
-              @CreatedAt
-          );";
-    }
+    protected virtual string InsertProc() => "insert_pan_response";
 
     public async Task InsertAsync(PanResponseJson e)
     {
@@ -38,7 +27,8 @@ public class RawResponseRepository : IRawResponseRepository
         try
         {
             await db.ExecuteAsync(
-                InsertQuery(),
+                $"CALL {InsertProc()}(" +
+                "@PanVerificationId, @RequestId, @EncryptedRawResponseJson, @CreatedAt)",
                 new
                 {
                     e.PanVerificationId,
@@ -51,9 +41,7 @@ public class RawResponseRepository : IRawResponseRepository
         }
         catch (Exception ex)
         {
-            SafeLogger.App(
-                $"RAW INSERT FAILED: {ex.Message}");
-
+            SafeLogger.App($"RAW INSERT FAILED: {ex.Message}");
             throw;
         }
     }

@@ -58,7 +58,7 @@ public static class ProviderMapper
         return new PanCommonResponseDto
         {
             IsSuccess = e.PanLookUpStatus == "SUCCESS",
-            // 🔥 FINAL FIX
+            
             Source = "DATABASE",
 
             Pan = e.EncryptedPan,

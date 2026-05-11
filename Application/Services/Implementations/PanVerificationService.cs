@@ -77,9 +77,7 @@ public class PanVerificationService : IPanVerificationService
             };
         }
 
-        // ─────────────────────────────────────────────
-        // ✅ FALLBACK FLOW
-        // ─────────────────────────────────────────────
+        
         var (success, response, providerName) =
             await _fallbackService.FallbackAsync(pan, correlationId);
 
